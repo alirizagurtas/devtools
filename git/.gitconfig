@@ -1,24 +1,29 @@
 [user]
-    name = Your Name
-    email = your.email@example.com
+    # Kullanıcı bilgileri
+	email = 19707245+alirizagurtas@users.noreply.github.com
+	name = arg
     # İmzalama için kullanılacak key
-    signingkey = YOUR_GPG_KEY_ID
+	signingkey = BCC85A0E5BD1D962
 
 [core]
+    # SSH komutu (SSH anahtarı kullanmak için)
+	sshCommand = ssh -i ~/.ssh/id_github
     # Varsayılan editör
     editor = code --wait
     # Satır sonu ayarları (Windows: true, Mac/Linux: input)
     autocrlf = input
-    # Beyaz boşluk uyarıları
-    whitespace = trailing-space,space-before-tab
     # Performans için preload index
     preloadindex = true
-    # Dosya modu değişikliklerini izleme
+    # Git’in dosya izin değişikliklerini (chmod) izlemesini kapatır.WSL/Windows’ta false önerilir.
     filemode = false
     # Unicode dosya adları için
     quotepath = false
     # Paralel checkout için (Git 2.35+)
     precomposeUnicode = true
+
+# Whitespace düzeltmeleri için delta kullan (yüklüyse)
+# [apply]
+#     whitespace = fix
 
 [init]
     # Varsayılan branch ismi
@@ -26,10 +31,12 @@
 
 [commit]
     # Commit'leri otomatik imzala
-    gpgsign = false
+    gpgsign = true
     # Commit template kullan
     # template = ~/.gitmessage
     verbose = true
+    # Commit mesajı şablonu
+    # template = ~/.gitmessage
 
 [push]
     # Sadece mevcut branch'i push et
@@ -67,7 +74,7 @@
     # Merge conflict çözümü için - zdiff3 en gelişmiş format (Git 2.35+)
     conflictstyle = zdiff3
     # Fast-forward only
-    ff = false
+    ff = true
     # Merge commit log ekle
     log = true
 
@@ -105,7 +112,7 @@
 
 [log]
     # Tarih formatı
-    date = iso
+    date = iso-local
     # Grafik gösterimi
     abbrevCommit = true
     # Email gösterimi
@@ -119,7 +126,7 @@
 
 [tag]
     # Tag'leri imzala
-    gpgSign = false
+    gpgSign = true
     # Tag sıralama
     sort = version:refname
 
@@ -141,6 +148,9 @@
     writeBitmaps = true
 
 [alias]
+    # Hızlı commit ve push
+    acp = "!f() { git add -A && git commit -m \"$@\" && git push; }; f"
+
     # Status kısayolları
     st = status -sb
     s = status
@@ -236,7 +246,7 @@
 
 [maintenance]
     # Otomatik bakım (Git 2.30+)
-    auto = false
+    auto = true
     strategy = incremental
 
 [feature]
@@ -256,16 +266,19 @@
     ui = auto
     branch = auto
 
+[format]
+    pretty = format:%C(auto)%h %C(bold blue)%an%Creset %s
+
 [interactive]
     # Interactive mod için diff filter
     diffFilter = delta --color-only
 
 [pager]
     # Delta pager (yüklüyse) - daha iyi diff görüntüleme
-    # diff = delta
-    # log = delta
-    # reflog = delta
-    # show = delta
+    diff = delta
+    log = delta
+    reflog = delta
+    show = delta
 
 # Git 2.51 Özel Notlar:
 # - git switch ve git restore artık stabil ve deneysel değil
