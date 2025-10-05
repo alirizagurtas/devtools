@@ -1,0 +1,276 @@
+[user]
+    name = Your Name
+    email = your.email@example.com
+    # İmzalama için kullanılacak key
+    signingkey = YOUR_GPG_KEY_ID
+
+[core]
+    # Varsayılan editör
+    editor = code --wait
+    # Satır sonu ayarları (Windows: true, Mac/Linux: input)
+    autocrlf = input
+    # Beyaz boşluk uyarıları
+    whitespace = trailing-space,space-before-tab
+    # Performans için preload index
+    preloadindex = true
+    # Dosya modu değişikliklerini izleme
+    filemode = false
+    # Unicode dosya adları için
+    quotepath = false
+    # Paralel checkout için (Git 2.35+)
+    precomposeUnicode = true
+
+[init]
+    # Varsayılan branch ismi
+    defaultBranch = main
+
+[commit]
+    # Commit'leri otomatik imzala
+    gpgsign = false
+    # Commit template kullan
+    # template = ~/.gitmessage
+    verbose = true
+
+[push]
+    # Sadece mevcut branch'i push et
+    default = simple
+    # Tag'leri otomatik push etme
+    followTags = true
+    # Push işlemlerinde atomic kullan
+    atomic = true
+    # Push güvenliği - remote tracking branch'i otomatik oluştur
+    autoSetupRemote = true
+
+[pull]
+    # Pull stratejisi (merge yerine rebase)
+    rebase = true
+    # Fast-forward only
+    ff = only
+
+[fetch]
+    # Silinen remote branch'leri otomatik temizle
+    prune = true
+    # Tüm tag'leri fetch et
+    pruneTags = true
+    # Paralel fetch (Git 2.33+)
+    parallel = 0
+
+[rebase]
+    # Rebase sırasında otostash
+    autoStash = true
+    # Rebase sırasında fixup ve squash'ları otomatik uygula
+    autoSquash = true
+    # Update refs (Git 2.38+)
+    updateRefs = true
+
+[merge]
+    # Merge conflict çözümü için - zdiff3 en gelişmiş format (Git 2.35+)
+    conflictstyle = zdiff3
+    # Fast-forward only
+    ff = false
+    # Merge commit log ekle
+    log = true
+
+[diff]
+    # Daha iyi diff algoritması
+    algorithm = histogram
+    # Renames ve copies'i algıla
+    renames = copies
+    # Renk kullan - moved code detection
+    colorMoved = zebra
+    # Submodule değişikliklerini göster
+    submodule = log
+    # Boşluk değişikliklerini vurgula
+    wsErrorHighlight = all
+
+[color]
+    ui = auto
+    branch = auto
+    diff = auto
+    status = auto
+    interactive = auto
+
+[color "diff"]
+    meta = yellow bold
+    frag = magenta bold
+    old = red bold
+    new = green bold
+    whitespace = red reverse
+
+[status]
+    # Branch bilgilerini göster
+    showUntrackedFiles = all
+    # Submodule özetini göster
+    submoduleSummary = true
+
+[log]
+    # Tarih formatı
+    date = iso
+    # Grafik gösterimi
+    abbrevCommit = true
+    # Email gösterimi
+    decorate = short
+
+[branch]
+    # Branch oluştururken tracking ayarla
+    autoSetupMerge = always
+    # Branch tracking bilgilerini göster - committer date'e göre sırala
+    sort = -committerdate
+
+[tag]
+    # Tag'leri imzala
+    gpgSign = false
+    # Tag sıralama
+    sort = version:refname
+
+[stash]
+    # Git 2.51: Stash show diff göster
+    showPatch = false
+    # Git 2.51: Stash include untracked
+    showIncludeUntracked = false
+
+[pack]
+    # Git 2.51: Path-walk repacking (daha küçük pack dosyaları)
+    # pathWalk = false
+    # Threads kullan
+    threads = 0
+
+[repack]
+    # Git 2.51: MIDX cruft pack optimizasyonu
+    # midxMustContainCruft = false
+    writeBitmaps = true
+
+[alias]
+    # Status kısayolları
+    st = status -sb
+    s = status
+    
+    # Branch yönetimi
+    br = branch
+    bra = branch -a
+    brd = branch -d
+    brD = branch -D
+    
+    # Checkout kısayolları (switch artık stabil - Git 2.51)
+    co = checkout
+    cob = checkout -b
+    sw = switch
+    swc = switch -c
+    
+    # Restore kısayolları (restore artık stabil - Git 2.51)
+    rs = restore
+    rss = restore --staged
+    
+    # Commit kısayolları
+    ci = commit
+    cm = commit -m
+    ca = commit --amend
+    can = commit --amend --no-edit
+    
+    # Log görüntüleme
+    l = log --oneline --graph --decorate
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+    ll = log --stat --abbrev-commit
+    lp = log --patch --abbrev-commit
+    
+    # Diff kısayolları
+    d = diff
+    dc = diff --cached
+    ds = diff --staged
+    
+    # Stash yönetimi (Git 2.51: export/import desteği)
+    sl = stash list
+    ss = stash save
+    sp = stash pop
+    sa = stash apply
+    # Git 2.51: Stash export/import
+    se = stash export
+    si = stash import
+    
+    # Temizlik ve bakım
+    cleanup = "!git branch --merged | grep -v '\\*\\|main\\|master\\|develop' | xargs -n 1 git branch -d"
+    undo = reset --soft HEAD^
+    unstage = reset HEAD --
+    
+    # Diğer kullanışlı alias'lar
+    last = log -1 HEAD --stat
+    contributors = shortlog --summary --numbered
+    aliases = config --get-regexp alias
+    
+    # Push/Pull kısayolları
+    pf = push --force-with-lease
+    pl = pull
+    
+    # Rebase kısayolları
+    rb = rebase
+    rbi = rebase -i
+    rbc = rebase --continue
+    rba = rebase --abort
+
+[help]
+    # Otomatik düzeltme (1 = 0.1 saniye)
+    autocorrect = 10
+
+[rerere]
+    # Çakışmaları hatırla ve tekrar kullan
+    enabled = true
+    autoupdate = true
+
+[credential]
+    # Credential helper (platform bazlı)
+    # Windows için: manager-core
+    # Mac için: osxkeychain
+    # Linux için: cache veya store
+    helper = cache --timeout=3600
+
+[url "git@github.com:"]
+    # HTTPS yerine SSH kullan
+    insteadOf = https://github.com/
+
+[filter "lfs"]
+    # Git LFS ayarları
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+
+[maintenance]
+    # Otomatik bakım (Git 2.30+)
+    auto = false
+    strategy = incremental
+
+[feature]
+    # Deneysel özellikler
+    manyFiles = true
+
+[transfer]
+    # Transfer güvenliği
+    fsckObjects = true
+
+[receive]
+    # Receive güvenliği
+    fsckObjects = true
+
+[column]
+    # Branch listeleme sütun formatı
+    ui = auto
+    branch = auto
+
+[interactive]
+    # Interactive mod için diff filter
+    diffFilter = delta --color-only
+
+[pager]
+    # Delta pager (yüklüyse) - daha iyi diff görüntüleme
+    # diff = delta
+    # log = delta
+    # reflog = delta
+    # show = delta
+
+# Git 2.51 Özel Notlar:
+# - git switch ve git restore artık stabil ve deneysel değil
+# - Stash export/import özelliği eklendi (git stash export/import)
+# - Path-walk repacking daha küçük pack dosyaları için (--path-walk)
+# - MIDX cruft pack optimizasyonları
+# - Bloom filter desteği çoklu pathspec için
+# - Reftable backend Git 3.0'da varsayılan olacak (özellik bayrağı ile)
