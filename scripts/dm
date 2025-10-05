@@ -1,0 +1,308 @@
+#!/bin/bash
+
+case "${1:-menu}" in
+    menu)
+        cmd=$(echo -e "ps\npsa\npsi\nrm\nimg\nrmi\nup\nupb\nreup\ndown\ndown-v\nrestart\nnuke\niup\nidown\nvol\nbuild\npull\nservices\nsh\nilogs\ncheck\ncheck-yaml\ninspect\nheal\nrecreate\nexit" | gum choose --header "Docker işlemi:")
+        [[ $cmd ]] && exec "$0" "$cmd"
+        # menuden çıkmasın istersen
+        # while true; do
+        #     cmd=$(echo -e "ps\npsa\npsi\nrm\nimg\nlogs\nexit" | gum choose --header "Docker işlemi:")
+        #     [[ $cmd == "exit" ]] && break
+        #     "$0" "$cmd"
+        # done
+        ;;
+
+    ps)
+        echo "📊 Çalışan containerlar:"
+        docker ps --format "table {{.ID}}\t{{.Status}}\t{{.Names}}\t{{.Ports}}"
+        ;;
+
+    psa)
+        echo "📋 Tüm containerlar:"
+        docker ps -a --format "table {{.ID}}\t{{.Status}}\t{{.Names}}\t{{.Ports}}"
+        ;;
+
+    psi)
+        echo "📋 Tüm containerlar ID'li:"
+        docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
+        ;;
+
+    rm)
+        echo "🛑 Kaldırılacak container'lar listeleniyor..."
+        list=$(docker ps -a --filter label=com.docker.compose.project --format "{{.Names}}@{{.Status}}" | sort -u)  # Names kullan, service değil
+        if [[ -z $list ]]; then
+            echo "❌ Çalışan container yok!"
+            exit 1
+        fi
+        formatted=$(echo "$list" | sed 's/@Up.*/ ✅ Running/' | sed 's/@Exited.*/ ❌ Stopped/' | sed 's/@Created.*/ 🟡 Created/')
+        selected=$(echo "$formatted" | gum choose --no-limit --header "Kaldırılacak container'lar:")
+        if [[ -n $selected ]]; then
+            while IFS= read -r item; do
+                [[ -z $item ]] && continue
+                container=$(echo "$item" | cut -d' ' -f1)
+                echo "🛑 $container durduruluyor..."
+                docker stop "$container"
+                echo "🗑️ $container kaldırılıyor..."
+                docker rm -f "$container"
+            done <<< "$selected"
+            echo "✅ Seçilen container'lar durduruldu ve kaldırıldı"
+        else
+            echo "❌ Hiçbir container seçilmedi"
+        fi
+        ;;
+
+    img)
+        echo "📋 Tüm image'lar listeleniyor:"
+        docker images --format "table {{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+        ;;
+
+    rmi)
+        echo "🗑️ Silinecek image'lar listeleniyor..."
+        images=$(docker images --format "{{.Repository}}:{{.Tag}}@{{.ID}}")  # <none> filterini kaldır
+        if [[ -z $images ]]; then
+            echo "❌ Silinecek image yok!"
+            exit 1
+        fi
+        formatted=$(echo "$images" | sed 's/@/ - /')
+        selected=$(echo "$formatted" | gum choose --no-limit --header "Silinecek image'lar (Space: seç, ctrl+a: tümü):")
+        if [[ -n $selected ]]; then
+            while IFS= read -r item; do
+                [[ -z $item ]] && continue
+                image_id=$(echo "$item" | awk '{print $NF}')  # Son field = ID
+                echo "🗑️ $image_id siliniyor..."
+                docker rmi -f "$image_id"
+            done <<< "$selected"
+            echo "✅ Seçilen image'lar silindi"
+            docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"  # Güncel listeyi göster
+        else
+            echo "❌ Hiçbir image seçilmedi"
+        fi
+        ;;
+
+    up)
+        echo "🚀 Servisler başlatılıyor..."
+        docker compose up -d
+        ;;
+
+    upb)
+        echo "🔨 Build yapılıyor ve servisler başlatılıyor..."
+        docker compose up -d --build
+        ;;
+
+    reup)
+        echo "♻️ Servisler tamamen yeniden oluşturuluyor..."
+        echo "🛑 Servisler durduruluyor..."
+        docker compose stop
+        docker compose down -v --remove-orphans
+        docker system prune -f
+        echo "⏳ Volume'lerin silinmesi bekleniyor..."
+        sleep 2
+        echo "🚀 Servisler yeniden başlatılıyor..."
+        docker compose up -d
+        ;;
+
+    down)
+        echo "🛑 Servisler durduruluyor..."
+        docker compose down
+        ;;
+
+    down-v)
+        echo "🛑 Servisler durduruluyor ve volumeler siliniyor..."
+        docker compose down -v --remove-orphans
+        ;;
+
+    restart)
+        if [ -z "$2" ]; then
+            echo "♻️ Tüm servisler yeniden başlatılıyor..."
+            docker compose restart
+        else
+            echo "♻️ $2 servisi yeniden başlatılıyor..."
+            docker compose restart "$2"
+        fi
+        ;;
+
+    recreate)
+    	if [ -n "$2" ]; then
+            echo "♻️ $2 servisi yeniden oluşturuluyor..."
+            docker compose up -d --no-deps "$2"
+        else
+            echo "⚠️ Lütfen yeniden oluşturulacak servisin adını girin!"
+        fi
+        ;;
+
+    nuke)
+        echo "💣 UYARI: Bu işlem TÜM Docker kaynaklarını silecek!"
+        read -rp "🔥 Devam etmek istediğinizden emin misiniz? (yes/NO): " confirm
+        if [ "$confirm" = "yes" ]; then
+            echo "🛑 Servisler durduruluyor..."
+            docker compose down -v --remove-orphans 2>/dev/null || true
+            echo "💥 Tüm sistem temizleniyor..."
+            docker system prune -a --volumes -f
+            echo "✅ Nuke tamamlandı - tüm containerlar, imajlar ve volume'ler silindi"
+        else
+            echo "❌ İşlem iptal edildi"
+        fi
+        ;;
+
+    iup)
+        services=$(docker compose config --services 2>/dev/null)
+        if [[ -z $services ]]; then
+            echo "❌ Compose dosyası bulunamadı!"
+            exit 1
+        fi
+        selected=$(echo "$services" | gum choose --no-limit --header "Başlatılacak servisler (Space: seç, a: tümü):")
+        if [[ -n $selected ]]; then
+            echo "$selected" | xargs docker compose up -d
+            echo "✅ Seçilen servisler başlatıldı"
+        else
+            echo "❌ Hiçbir servis seçilmedi"
+        fi
+        ;;
+
+    idown)
+        services=$(docker compose config --services 2>/dev/null)
+        if [[ -z $services ]]; then
+            echo "❌ Compose dosyası bulunamadı!"
+            exit 1
+        fi
+        selected=$(echo "$services" | gum choose --no-limit --header "Kaldırılacak servisler (Space: seç, a: tümü):")
+        if [[ -n $selected ]]; then
+            for svc in $selected; do
+                docker compose rm -f -s "$svc" 2>/dev/null
+            done
+            echo "✅ Seçilen servisler kaldırıldı"
+        else
+            echo "❌ Hiçbir servis seçilmedi"
+        fi
+        ;;
+
+
+    build)
+        echo "🔨 İmajlar build ediliyor..."
+        docker build
+        ;;
+
+    pull)
+        echo "📥 İmajlar güncelleniyor..."
+        docker pull
+        ;;
+
+    services)
+        echo "📋 Mevcut servisler:"
+        docker config --services
+        ;;
+
+    vol)
+        echo "📋 Mevcut volume'ler:"
+        docker volume ls
+        ;;
+
+    sh)
+        containers=$(docker ps --format "{{.Names}}")
+        if [[ -z $containers ]]; then
+            echo "❌ Hiçbir çalışan container yok!"
+            exit 1
+        fi
+
+        selected=$(echo "$containers" | gum choose --header "Bağlanılacak container:")
+        if [[ -z $selected ]]; then
+            echo "❌ Hiçbir container seçilmedi"
+            exit 1
+        fi
+
+        echo "🔗 $selected içine bağlanılıyor..."
+        docker exec -it "$selected" bash 2>/dev/null || docker exec -it "$selected" sh
+        ;;
+
+    ilogs)
+        services=$(docker compose config --services 2>/dev/null)
+        if [[ -z $services ]]; then
+            echo "❌ Compose dosyası bulunamadı veya servis yok!"
+            exit 1
+        fi
+
+        selected=$(echo "$services" | gum choose --header "Logları izlenecek servis:")
+        if [[ -z $selected ]]; then
+            echo "❌ Hiçbir servis seçilmedi"
+            exit 1
+        fi
+
+        mode=$(echo -e "Tümü\nSon 100 satır\nSon 5 dakika\nSon 10 dakika" | gum choose --header "Log görüntüleme modu:")
+        if [[ -z $mode ]]; then
+            echo "❌ Görüntüleme modu seçilmedi"
+            exit 1
+        fi
+
+        case "$mode" in
+            "Son 100 satır")
+                echo "📄 $selected servis logları (son 100 satır, timestamps, canlı izleme)..."
+                docker compose logs -f --tail=100 --timestamps "$selected"
+                ;;
+            "Son 5 dakika")
+                echo "📄 $selected servis logları (son 5 dk, timestamps, canlı izleme)..."
+                docker compose logs -f --since=5m --timestamps "$selected"
+                ;;
+            "Son 10 dakika")
+                echo "📄 $selected servis logları (son 10 dk, timestamps, canlı izleme)..."
+                docker compose logs -f --since=10m --timestamps "$selected"
+                ;;
+            *)
+                echo "📄 $selected servis logları (tamamı, timestamps, canlı izleme)..."
+                docker compose logs -f --timestamps "$selected"
+                ;;
+        esac
+        ;;
+
+    logs)
+        if [ -z "$2" ]; then
+            echo "❌ Kullanım: dm logs <servis_adı>"
+            echo "💡 Mevcut servisler:"
+            docker compose config --services
+            exit 1
+        fi
+        echo "📄 $2 servis logları izleniyor... (Çıkmak için Ctrl+C)"
+        # docker compose logs -f "$2"
+        docker compose logs "$2"
+        ;;
+
+    inspect)
+        if [ -z "$2" ]; then
+            echo "❌ Kullanım: dm logs <servis_adı>"
+            echo "💡 Girilen servisin IP Adresi:"
+            docker inspect -f
+            exit 1
+        fi
+        echo "📄 $2 servisinin IP Adresi"
+        docker inspect -f "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}" "$2"
+        ;;
+
+    heal)
+        if [ -z "$2" ]; then
+            echo "❌ Kullanım: dm heal <servis_adı>"
+            echo "💡 Girilen servisin healty sağlık kontrolü:"
+            docker inspect --format '{{json .State.Health}}' | jq
+            exit 1
+        fi
+        echo "📄 $2 servisinin IP Adresi"
+        docker inspect "$2" --format '{{json .State.Health}}' | jq
+        ;;
+
+    check)
+        echo "🔍 compose.yaml docker config ile kontrol ediliyor..."
+        docker compose config >/dev/null
+        if [[ $? -eq 0 ]]; then
+            echo "✅ Dosya geçerli"
+        else
+            echo "❌ Syntax hatası var!"
+        fi
+        ;;
+
+    check-yaml)
+        echo "🔍 compose.yaml YAML lint(yamllint) ile kontrol ediliyor..."
+        if ! command -v yamllint >/dev/null; then
+          echo "ℹ️ yamllint bulunamadı. Kur: pip install yamllint"
+        fi
+        yamllint -d "{extends: default, rules: {line-length: disable}}" compose.yaml
+        ;;
+
+esac
