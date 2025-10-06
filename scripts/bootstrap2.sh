@@ -2,6 +2,9 @@
 # WSL Ubuntu 24.04 Controller Bootstrap — sade & idempotent
 set -euo pipefail
 
+# Oturum için anında PATH (uv & ansible-core)
+export PATH="$HOME/.local/bin:$HOME/.local/share/uv/tools/ansible-core/bin:$PATH"
+
 # ========= Config =========
 readonly VM_NET_CIDR="${VM_NET_CIDR:-10.10.0.0/19}"
 readonly ANSIBLE_VERSION="2.19.2"
@@ -174,11 +177,14 @@ install_uv_and_ansible() {
   step "uv kuruluyor…"
   curl -LsSf https://astral.sh/uv/install.sh | bash
 
+  # uv kurulduktan sonra anlık PATH'e ekle (oturumu beklemeyelim)
+  export PATH="$HOME/.local/bin:$PATH"
+
   step "Ansible [core ${ANSIBLE_VERSION}] kuruluyor…"
   "$HOME/.local/bin/uv" tool install "ansible-core==${ANSIBLE_VERSION}" --with ansible --force
 
-  # Mutlak yoldan ansible-galaxy (PATH’e bağlı değil)
   local UV_TOOLS_BIN="$HOME/.local/share/uv/tools/ansible-core/bin"
+
   step "Ansible Collections (community.kubernetes)…"
   "$UV_TOOLS_BIN/ansible-galaxy" collection install community.kubernetes
 
