@@ -15,35 +15,30 @@ readonly ARCH="$(dpkg --print-architecture)"
 export DEBIAN_FRONTEND=noninteractive
 
 # ===== Logging & Traps =====
-log() { printf '%s %s\n' "$1" "${*:2}"; }           # usage: log "✅" "message"
-step() { printf '\n%s %s\n' "🔧" "$*"; }
-err_trap() { log "❌" "Hata! Komut: '${BASH_COMMAND}'  Satır: ${BASH_LINENO[*]}"; exit 1; }
+log()   { printf '%s %s\n' "$1" "${*:2}"; }  # usage: log "✅" "message"
+step()  { printf '\n%s %s\n' "🔧" "$*"; }
+err_trap(){ log "❌" "Hata! Komut: '${BASH_COMMAND}'  Satır: ${BASH_LINENO[*]}"; exit 1; }
 trap err_trap ERR
 
-# ===== Helpers =====
-apt_update_once() {
-  if [[ ! -f /var/lib/apt/periodic/updated-stamp ]] || find /var/lib/apt/ -name 'lists/*Packages' -mmin +30 >/dev/null 2>&1; then
-    sudo apt-get update -y
-  fi
-}
-apt_install() { sudo apt-get install -y --no-install-recommends "$@"; }
-write_root_file() { # usage: write_root_file /path/to/file <<'EOF' ... EOF
-  sudo tee "$1" >/dev/null
-}
-ensure_dir() { sudo install -d -m "${3:-0755}" "$2" >/dev/null 2>&1 || sudo mkdir -p "$2"; } # usage ensure_dir owner:group /dir 0755
+# ===== Helpers (modern apt) =====
+apt_update()   { sudo apt update -y; }
+apt_upgrade()  { sudo apt upgrade -y; }
+apt_install()  { sudo apt install -y --no-install-recommends "$@"; }
+write_root()   { sudo tee "$1" >/dev/null; }
+ensure_dir()   { sudo install -d -m "${3:-0755}" "$2"; } # ensure_dir owner:group /dir 0755
 
 # ===== System base =====
 update_system() {
   step "Sistem güncelleniyor ve temel araçlar kuruluyor…"
-  apt_update_once
-  sudo apt-get upgrade -y
+  apt_update
+  apt_upgrade
   apt_install ca-certificates curl gnupg net-tools iproute2 nano
 }
 
 # ===== Persistent route (WSL → VM ağları) =====
 setup_persistent_route() {
   step "Kalıcı route betiği ayarlanıyor…"
-  write_root_file /usr/local/bin/add-route.sh <<'EOF'
+  write_root /usr/local/bin/add-route.sh <<'EOF'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 GW="$(grep -m1 '^nameserver ' /etc/resolv.conf | awk '{print $2}')"
@@ -52,12 +47,12 @@ EOF
   sudo sed -i "s|__VM_NET_CIDR__|${VM_NET_CIDR}|g" /usr/local/bin/add-route.sh
   sudo chmod +x /usr/local/bin/add-route.sh
 
-  write_root_file /etc/sudoers.d/99-wsl-route <<EOF
+  write_root /etc/sudoers.d/99-wsl-route <<EOF
 ${CURRENT_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/add-route.sh, /usr/sbin/ip
 EOF
   sudo chmod 0440 /etc/sudoers.d/99-wsl-route
 
-  write_root_file /etc/profile.d/add-route.sh <<'EOF'
+  write_root /etc/profile.d/add-route.sh <<'EOF'
 #!/usr/bin/env bash
 /usr/local/bin/add-route.sh >/dev/null 2>&1 || true
 EOF
@@ -69,10 +64,11 @@ EOF
 # ===== Git (latest PPA) + delta =====
 install_latest_git() {
   step "Git (PPA) kuruluyor…"
+  apt_install software-properties-common
   sudo add-apt-repository -y -n ppa:git-core/ppa
-  sudo apt-get update -y
+  apt_update
   apt_install git
-  log "✅" "Git $(git --version | awk '{print $3}')" 
+  log "✅" "Git $(git --version | awk '{print $3}')"
 }
 install_git_delta() {
   step "git-delta kuruluyor…"
@@ -93,7 +89,7 @@ install_dev_tools() {
   step "Geliştirici araçları kuruluyor…"
   apt_install iputils-ping dnsutils nmap btop ncdu \
              jq yq ripgrep bat fzf gh vim whois mkcert
-  write_root_file /etc/profile.d/dev-aliases.sh <<'EOF'
+  write_root /etc/profile.d/dev-aliases.sh <<'EOF'
 # — Dev aliases —
 alias cat='batcat --paging=never'
 alias top='btop'
@@ -115,13 +111,13 @@ install_gum() {
   step "Gum kuruluyor…"
   ensure_dir root:root /etc/apt/keyrings
   curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
-  write_root_file /etc/apt/sources.list.d/charm.list <<'EOF'
+  write_root /etc/apt/sources.list.d/charm.list <<'EOF'
 deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *
 EOF
-  sudo apt-get update -y
+  apt_update
   apt_install gum
   # TERM=dumb wrapper (yavaş terminalde hız için)
-  write_root_file /etc/profile.d/gum-optimize.sh <<'EOF'
+  write_root /etc/profile.d/gum-optimize.sh <<'EOF'
 # Gum performance optimization
 gum() { TERM=dumb /usr/bin/gum "$@"; }
 EOF
@@ -134,21 +130,25 @@ install_docker() {
   step "Docker CE + Buildx + Compose kuruluyor…"
   # Çakışan paketleri kaldır
   local old_pkgs=(docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc)
-  for p in "${old_pkgs[@]}"; do sudo apt-get remove -y "$p" 2>/dev/null || true; done
+  for p in "${old_pkgs[@]}"; do sudo apt remove -y "$p" 2>/dev/null || true; done
 
   ensure_dir root:root /usr/share/keyrings
   curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker.gpg
   sudo chmod a+r /usr/share/keyrings/docker.gpg
 
-  write_root_file /etc/apt/sources.list.d/docker.list <<EOF
+  write_root /etc/apt/sources.list.d/docker.list <<EOF
 deb [arch=${ARCH} signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${CODENAME} stable
 EOF
-  sudo apt-get update -y
+  apt_update
   apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
+  # Kullanıcıyı docker grubuna ekle + yeni grup anında etkin
   sudo usermod -aG docker "${CURRENT_USER}" || true
+  newgrp docker <<'EONG'
+docker version >/dev/null 2>&1 && echo "  ↳ Docker (root'suz) çalışıyor"
+EONG
 
-  # Docker servis
+  # Systemd servis
   if [[ -d /run/systemd/system ]]; then
     sudo systemctl enable --now docker
     log "✅" "Docker systemd servisi etkin."
@@ -166,32 +166,38 @@ EOF
 install_uv_and_ansible() {
   step "uv kuruluyor…"
   curl -LsSf https://astral.sh/uv/install.sh | bash
-  export PATH="$HOME/.local/bin:$PATH"
 
   step "Ansible [core ${ANSIBLE_VERSION}] kuruluyor…"
-  uv tool install "ansible-core==${ANSIBLE_VERSION}" --with ansible --force
+  "$HOME/.local/bin/uv" tool install "ansible-core==${ANSIBLE_VERSION}" --with ansible --force
 
   step "Ansible Collections (community.kubernetes)…"
   ansible-galaxy collection install community.kubernetes
   log "✅" "UV ve Ansible kuruldu."
 }
 
-# ===== PATH update for uv/ansible =====
+# ===== PATH update for ~/.local/bin & uv/ansible (kalıcı) =====
 update_profile_path() {
-  step "PATH güncelleniyor (~/.profile)…"
-  local needle='$HOME/.local/share/uv/tools/ansible-core/bin'
-  if ! grep -Fq "$needle" "$HOME/.profile" 2>/dev/null; then
+  step "PATH kalıcı güncelleniyor (~/.profile)…"
+  local needle1='$HOME/.local/bin'
+  local needle2='$HOME/.local/share/uv/tools/ansible-core/bin'
+  if ! grep -Fq "$needle1" "$HOME/.profile" 2>/dev/null; then
     cat >> "$HOME/.profile" <<'EOF'
 
-# Add uv-managed Ansible binaries to PATH
+# Local user bin
+if [[ -d "$HOME/.local/bin" ]]; then
+  PATH="$HOME/.local/bin:$PATH"
+fi
+EOF
+  fi
+  if ! grep -Fq "$needle2" "$HOME/.profile" 2>/dev/null; then
+    cat >> "$HOME/.profile" <<'EOF'
+# uv-managed Ansible binaries
 if [[ -d "$HOME/.local/share/uv/tools/ansible-core/bin" ]]; then
   PATH="$HOME/.local/share/uv/tools/ansible-core/bin:$PATH"
 fi
 EOF
-    log "✅" "~/.profile güncellendi."
-  else
-    log "ℹ️" "PATH zaten ayarlı, atlanıyor."
   fi
+  log "✅" "~/.profile güncellendi (kalıcı PATH)."
 }
 
 # ===== SSH / GPG keys copy (WSL → Linux home) =====
@@ -218,6 +224,28 @@ copy_gpg_keys() {
   log "✅" "GPG anahtarları kopyalandı. ($(find "$wsl" -type f | wc -l) dosya)"
 }
 
+# ===== Tailscale =====
+install_tailscale() {
+  step "Tailscale kuruluyor…"
+  ensure_dir root:root /usr/share/keyrings
+  curl -fsSL "https://pkgs.tailscale.com/stable/ubuntu/${CODENAME}.noarmor.gpg" \
+    | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+  write_root /etc/apt/sources.list.d/tailscale.list <<EOF
+deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] https://pkgs.tailscale.com/stable/ubuntu ${CODENAME} main
+EOF
+  apt_update
+  apt_install tailscale
+
+  if [[ -d /run/systemd/system ]]; then
+    sudo systemctl enable --now tailscaled
+    log "✅" "tailscaled servis aktif. Bağlanmak için: sudo tailscale up"
+  else
+    # WSL systemd kapalıysa userspace:
+    sudo tailscaled --tun=userspace-networking --socks5-server=localhost:1055 --outbound-http-proxy-listen=localhost:1056 >/dev/null 2>&1 &
+    log "ℹ️" "WSL userspace modda tailscaled başlatıldı (geçici). Kalıcı servis için WSL systemd aç."
+  fi
+}
+
 # ===== Summary =====
 print_summary() {
   printf '\n%s\n' "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -227,8 +255,11 @@ print_summary() {
   echo
   { docker --version && docker compose version; } 2>/dev/null || true
   echo
+  { tailscale version || true; } 2>/dev/null
+  echo
   echo "ℹ️  Docker grup yetkisi için WSL'i yeniden başlatmanız gerekebilir:"
   echo "⚠️  wsl --shutdown"
+  echo "ℹ️  Tailscale ilk kurulum: sudo tailscale up --accept-routes --ssh"
   echo
 }
 
@@ -250,6 +281,7 @@ main() {
   update_profile_path
   copy_ssh_keys
   copy_gpg_keys
+  install_tailscale
   print_summary
 }
 
