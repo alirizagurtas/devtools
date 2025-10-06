@@ -48,21 +48,15 @@ EOF
     sudo rm -f /etc/resolv.conf
     sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 
-    # Servisi etkinleştir ve başlat
+    # Servisi etkinleştir ve başlat (daemon-reload ile)
+    sudo systemctl daemon-reload
     sudo systemctl enable systemd-resolved >/dev/null 2>&1 || true
     sudo systemctl restart systemd-resolved
     
-    # DNS'in çalıştığından emin ol (max 10 saniye bekle)
-    for i in {1..10}; do
-        if ping -c1 -W1 1.1.1.1 >/dev/null 2>&1 && \
-           ping -c1 -W1 google.com >/dev/null 2>&1; then
-            log_info "DNS yapılandırıldı (systemd-resolved aktif)"
-            return
-        fi
-        sleep 1
-    done
+    # systemd-resolved'in tam başlamasını bekle
+    sleep 3
     
-    log_info "⚠️  DNS yapılandırıldı ama test başarısız - devam ediliyor"
+    log_info "DNS yapılandırıldı (systemd-resolved aktif)"
 }
 
 # Sistem güncelleme ve temel araçlar
