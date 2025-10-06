@@ -3,7 +3,7 @@ set -euo pipefail
 
 # === CONFIGURATION ===
 readonly SCRIPT_NAME="$(basename "$0")"
-readonly VM_NET_CIDR="${VM_NET_CIDR:-10.10.0.0/16}"
+readonly VM_NET_CIDR="${VM_NET_CIDR:-10.10.0.0/19}"
 readonly ANSIBLE_VERSION="2.19.2"
 
 # === FUNCTIONS ===
@@ -16,53 +16,11 @@ log_step() {
     echo "🔧 $*"
 }
 
-# WSL systemd + DNS (systemd-resolved)
-configure_wsl_network() {
-    log_step "WSL systemd + DNS (systemd-resolved) ayarlanıyor..."
-    
-    # DNS zaten yapılandırıldı mı kontrol et
-    if [[ -f /etc/systemd/resolved.conf.d/dns.conf ]] && \
-       [[ -L /etc/resolv.conf ]] && \
-       [[ "$(readlink /etc/resolv.conf)" == "/run/systemd/resolve/stub-resolv.conf" ]]; then
-        log_info "DNS zaten yapılandırılmış, atlanıyor"
-        return
-    fi
-    
-    # WSL config
-    sudo tee /etc/wsl.conf >/dev/null <<'EOF'
-[boot]
-systemd=true
-[network]
-generateResolvConf=false
-EOF
-
-    # systemd-resolved DNS config
-    sudo mkdir -p /etc/systemd/resolved.conf.d
-    sudo tee /etc/systemd/resolved.conf.d/dns.conf >/dev/null <<'EOF'
-[Resolve]
-DNS=1.1.1.1 8.8.8.8
-FallbackDNS=9.9.9.9
-EOF
-
-    # resolv.conf'u systemd-resolved'e bağla
-    sudo rm -f /etc/resolv.conf
-    sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-
-    # Servisi etkinleştir ve başlat (daemon-reload ile)
-    sudo systemctl daemon-reload
-    sudo systemctl enable systemd-resolved >/dev/null 2>&1 || true
-    sudo systemctl restart systemd-resolved
-    
-    # systemd-resolved'in tam başlamasını bekle
-    sleep 3
-    
-    log_info "DNS yapılandırıldı (systemd-resolved aktif)"
-}
-
 # Sistem güncelleme ve temel araçlar
 update_system() {
     log_step "Sistem güncelleniyor..."
     sudo apt update -y
+    sudo apt upgrade -y
     sudo apt install -y ca-certificates curl gnupg net-tools iproute2 nano
 }
 
@@ -330,7 +288,6 @@ print_summary() {
     echo "ℹ️  Docker grup yetkisi için WSL'i yeniden başlatmanız gerekebilir:"
     echo "⚠️  wsl --shutdown"
     echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
 
 # === MAIN EXECUTION ===
@@ -339,7 +296,6 @@ main() {
     echo "🚀 WSL Ubuntu Controller Kurulum Scripti"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     
-    configure_wsl_network
     update_system
     setup_persistent_route
     install_latest_git
