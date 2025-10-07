@@ -57,22 +57,6 @@ install_base_and_tools() {
     mkcert \
     git-delta
 
-  # dev aliaslar
-  sudo tee /etc/profile.d/dev-aliases.sh >/dev/null <<'EOF'
-# — Dev aliases —
-alias cat='batcat --paging=never'
-alias top='btop'
-alias findtxt='rg'
-alias json='jq .'
-alias yml='yq .'
-alias gs='git status'
-alias gc='git commit -m'
-alias gp='git push'
-alias ga='git add .'
-alias ghme='gh repo view --web'
-EOF
-  sudo chmod +x /etc/profile.d/dev-aliases.sh
-
   ok "Temel sistem ve dev araçlar kuruldu."
 }
 
@@ -412,6 +396,50 @@ system_cleanup() {
   # sudo apt autoclean -y
 }
 
+# ========= Dev alias'lar (Ubuntu standardı: ~/.bash_aliases — sade) =========
+setup_dev_aliases() {
+  step "Dev alias'lar ayarlanıyor (~/.bash_aliases)…"
+
+  local FILE="$HOME/.bash_aliases"
+
+  if [[ ! -f "$FILE" ]]; then
+    cat > "$FILE" <<'EOF'
+# ================================================
+# ~/.bash_aliases — Ubuntu standardı
+# Bu dosyada alias'larını yönetirsin. (Tek sefer yazılır)
+# ================================================
+have(){ command -v "$1" >/dev/null 2>&1; }
+
+# --- Varsayılan alias'lar ---
+have batcat && alias cat='batcat --paging=never'
+have btop   && alias top='btop'
+have rg     && alias findtxt='rg'
+have jq     && alias json='jq .'
+have yq     && alias yml='yq .'
+have git    && alias gs='git status'
+have git    && alias gc='git commit -m'
+have git    && alias gp='git push'
+have git    && alias ga='git add .'
+have gh     && alias ghme='gh repo view --web'
+have base64 && alias b64='base64 -w 0'   # tek satır base64 encode
+have newgrp && alias docker-now='newgrp docker'  # docker'ı anında dene (exit ile çık)
+
+# --- KENDİ ÖZEL ALIAS'LARIN (BURAYA EKLE) ---
+# Örnek:
+# alias k='kubectl'
+# alias tf='terraform'
+# alias ta='tailscale'
+alias b64='base64 -w 0'
+EOF
+  fi
+
+  # Bu oturumda etkinleştir
+  # shellcheck disable=SC1090
+  . "$FILE"
+
+  ok "Alias'lar hazır. Düzenleme dosyası: $FILE"
+}
+
 # ========= Summary =========
 print_summary() {
   echo
@@ -441,6 +469,7 @@ main() {
   install_docker
   install_uv_and_ansible
   update_profile_path
+  setup_dev_aliases
   copy_ssh_keys
   copy_gpg_keys
   install_tailscale
