@@ -327,6 +327,14 @@ EOF
   ok "Unattended-Upgrades etkin (security-only, reboot yok)."
 }
 
+# ========= Cleanup =========
+system_cleanup() {
+  step "Sistem temizliği…"
+  sudo apt autoremove --purge -y
+  # (opsiyonel) paket önbelleğini de küçültmek istersen:
+  # sudo apt autoclean -y
+}
+
 # ========= Summary =========
 print_summary() {
   echo
