@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # WSL Ubuntu 24.04 Controller Bootstrap — sade & idempotent
-set -euo pipefail
+set -Eeo pipefail
+trap 'echo "💥 Hata satır: $LINENO komut: $BASH_COMMAND"' ERR
 
 # Oturum için anında PATH (uv & ansible-core)
 export PATH="$HOME/.local/bin:$HOME/.local/share/uv/tools/ansible-core/bin:$PATH"
@@ -374,6 +375,7 @@ main() {
   copy_gpg_keys
   install_tailscale
   install_unattended_upgrades
+  system_cleanup 
   print_summary
 }
 
