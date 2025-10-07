@@ -279,6 +279,54 @@ EOF
   fi
 }
 
+# ========= Unattended Upgrades (security-only, no reboot) =========
+install_unattended_upgrades() {
+  step "Unattended-Upgrades (güvenlik güncellemeleri) ayarlanıyor…"
+
+  apt_install \
+    unattended-upgrades \
+    apt-listchanges
+
+  # Security-only ve temel ayarlar
+  sudo tee /etc/apt/apt.conf.d/50unattended-upgrades >/dev/null <<'EOF'
+// Otomatik güvenlik güncellemeleri (Ubuntu 24.04 - noble)
+Unattended-Upgrade::Origins-Pattern {
+        "origin=Ubuntu,codename=${distro_codename}-security,label=Ubuntu";
+};
+// İsteğe bağlı: normal updates'i de açmak istersen yukarıya benzer bir satır ekleyebilirsin.
+// "origin=Ubuntu,codename=${distro_codename},label=Ubuntu";
+
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Skip-Updates-On-Metered-Connections "true";
+Unattended-Upgrade::OnlyOnACPower "false";
+Unattended-Upgrade::MinimalSteps "true";
+
+// Loglar
+Unattended-Upgrade::SyslogEnable "true";
+Unattended-Upgrade::SyslogFacility "daemon";
+EOF
+
+  # Günlük kontrol ve upgrade tetikleme (periodic)
+  sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+EOF
+
+  # systemd varsa timer'ları aktif et
+  if [[ -d /run/systemd/system ]]; then
+    sudo systemctl enable --now unattended-upgrades.service >/dev/null 2>&1 || true
+    sudo systemctl enable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+  fi
+
+  # İlk çalıştırmayı elle test etmek için (log üretir, gerçek kurulum yapmaz)
+  sudo unattended-upgrades --dry-run --debug >/dev/null 2>&1 || true
+
+  ok "Unattended-Upgrades etkin (security-only, reboot yok)."
+}
+
 # ========= Summary =========
 print_summary() {
   echo
@@ -311,6 +359,7 @@ main() {
   copy_ssh_keys
   copy_gpg_keys
   install_tailscale
+  install_unattended_upgrades
   print_summary
 }
 
