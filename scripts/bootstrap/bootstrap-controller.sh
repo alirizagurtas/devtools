@@ -170,7 +170,7 @@ EOF
   echo "ℹ️ Docker grup değişikliği WSL yeniden başlatınca etkili olur: wsl --shutdown"
 
   # dm helper
-  curl -fsSL https://raw.githubusercontent.com/alirizagurtas/devtools/main/scripts/dm -o /tmp/dm
+  curl -fsSL https://raw.githubusercontent.com/alirizagurtas/devtools/main/scripts/helpers/dm -o /tmp/dm
   sudo install -m 0755 /tmp/dm /usr/local/bin/dm
   rm -f /tmp/dm
   ok "Docker & dm hazır."
