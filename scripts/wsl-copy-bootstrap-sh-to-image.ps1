@@ -1,5 +1,5 @@
 # --- Settings ---
-$File    = "bootstrap.sh"
+$File    = "bootstrap-controller.sh"
 $Distro  = "Ubuntu-24.04"       # wsl -l -q ile ismini doğrula
 $RawUrl  = "https://raw.githubusercontent.com/alirizagurtas/devtools/main/scripts/$File"
 
