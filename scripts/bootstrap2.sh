@@ -157,13 +157,17 @@ EOF
     docker-buildx-plugin \
     docker-compose-plugin
 
+  # kullaniciyi docker grubuna ekle
   sudo usermod -aG docker "${CURRENT_USER}" || true
-  newgrp docker <<'EONG'
-docker version >/dev/null 2>&1 && echo "  ↳ Docker (root'suz) çalışıyor"
-EONG
+  
+  # systemd ortamında docker servisini etkinleştir
   if [[ -d /run/systemd/system ]]; then
     sudo systemctl enable --now docker
   fi
+  
+  # WSL için net uyarı
+  echo " ↳ Docker (root'suz) çalışacak"
+  echo "ℹ️ Docker grup değişikliği WSL yeniden başlatınca etkili olur: wsl --shutdown"
 
   # dm helper
   curl -fsSL https://raw.githubusercontent.com/alirizagurtas/devtools/main/scripts/dm -o /tmp/dm
@@ -171,6 +175,8 @@ EONG
   rm -f /tmp/dm
   ok "Docker & dm hazır."
 }
+
+
 
 # ========= 7) UV & Ansible =========
 install_uv_and_ansible() {
