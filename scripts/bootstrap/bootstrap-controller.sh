@@ -198,50 +198,120 @@ install_uv_and_ansible() {
   ok "UV ve Ansible kuruldu."
 }
 
-# ========= 8) PATH kalıcı (login & non-login) =========
+# ========= 8) PATH kalıcı (tek dosya + hatırlatma notları) =========
 update_profile_path() {
-  step "PATH kalıcı güncelleniyor (~/.profile & ~/.bashrc)…"
+  step "PATH kalıcı güncelleniyor…"
 
-  # ~/.profile
-  if ! grep -Fq '$HOME/.local/bin' "$HOME/.profile" 2>/dev/null; then
-    cat >> "$HOME/.profile" <<'EOF'
+  local SNIP="$HOME/.wsl-paths.sh"
+  local SRC='[ -f "$HOME/.wsl-paths.sh" ] && . "$HOME/.wsl-paths.sh"'
 
-# Local user bin
-if [[ -d "$HOME/.local/bin" ]]; then
-  PATH="$HOME/.local/bin:$PATH"
-fi
-EOF
-  fi
-  if ! grep -Fq '$HOME/.local/share/uv/tools/ansible-core/bin' "$HOME/.profile" 2>/dev/null; then
-    cat >> "$HOME/.profile" <<'EOF'
-# uv-managed Ansible binaries
-if [[ -d "$HOME/.local/share/uv/tools/ansible-core/bin" ]]; then
-  PATH="$HOME/.local/share/uv/tools/ansible-core/bin:$PATH"
-fi
-EOF
-  fi
+  if [[ ! -f "$SNIP" ]]; then
+    cat > "$SNIP" <<'EOF'
+# ================================================
+# WSL PATH SNIPPET — burayı düzenleyin
+# Bu dosyada PATH'e eklenecek dizinleri yönetirsiniz.
+# Aşağıdaki helper ile PATH'e idempotent şekilde öne eklenir.
+#
+# — KULLANIM HATIRLATICI —
+# “KENDİ ÖZEL YOLLARIN (BURAYA EKLE)” bölümüne şunu ekle:
+#   prepend_path "/opt/mytool/bin"
+#
+# Kaydet → yeni shell aç; ya da mevcutta etkin olsun diye:
+#   . ~/.wsl-paths.sh
+#
+# Hızlı CLI ekleme örnekleri:
+#   # tek komutla ekle
+#   echo 'prepend_path "/opt/mytool/bin"' >> ~/.wsl-paths.sh && . ~/.wsl-paths.sh
+#
+#   # mevcut PATH’i gör
+#   echo "$PATH"
+# ================================================
 
-  # ~/.bashrc (non-login)
-  if ! grep -Fq '$HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
-    cat >> "$HOME/.bashrc" <<'EOF'
-
-# Ensure user-local bin in non-login shells
-if [[ -d "$HOME/.local/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-  PATH="$HOME/.local/bin:$PATH"
-fi
-EOF
-  fi
-  if ! grep -Fq '$HOME/.local/share/uv/tools/ansible-core/bin' "$HOME/.bashrc" 2>/dev/null; then
-    cat >> "$HOME/.bashrc" <<'EOF'
-# Ensure uv-managed Ansible in non-login shells
-if [[ -d "$HOME/.local/share/uv/tools/ansible-core/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/share/uv/tools/ansible-core/bin:"* ]]; then
-  PATH="$HOME/.local/share/uv/tools/ansible-core/bin:$PATH"
-fi
-EOF
-  fi
-
-  ok "PATH kalıcı olarak yazıldı."
+# Helper: PATH'e (yoksa) başa ekle
+prepend_path() {
+  case ":$PATH:" in
+    *":$1:"*) ;;              # zaten var → dokunma
+    *) PATH="$1:$PATH" ;;     # yok → başa ekle
+  esac
 }
+
+# --- Standart eklenen yollar ---
+# 1) Kullanıcı local bin
+prepend_path "$HOME/.local/bin"
+
+# 2) uv ile kurulan ansible-core binary'leri
+prepend_path "$HOME/.local/share/uv/tools/ansible-core/bin"
+
+# --- KENDİ ÖZEL YOLLARIN (BURAYA EKLE) ---
+# Örnek:
+# prepend_path "$HOME/bin"
+# prepend_path "/opt/foo/bin"
+
+export PATH
+EOF
+  else
+    # Mevcutsa, standart 2 yolu içerdiğinden emin ol
+    grep -Fq '$HOME/.local/bin' "$SNIP" \
+      || printf '\nprepend_path "$HOME/.local/bin"\n' >> "$SNIP"
+    grep -Fq '$HOME/.local/share/uv/tools/ansible-core/bin' "$SNIP" \
+      || printf 'prepend_path "$HOME/.local/share/uv/tools/ansible-core/bin"\n' >> "$SNIP"
+  fi
+
+  # Login & non-login shell'lere tek satır kaynak ekle
+  grep -Fqx "$SRC" "$HOME/.profile" 2>/dev/null || printf '\n%s\n' "$SRC" >> "$HOME/.profile"
+  grep -Fqx "$SRC" "$HOME/.bashrc"   2>/dev/null || printf '\n%s\n' "$SRC" >> "$HOME/.bashrc"
+
+  # Şimdiki oturumda da etkinleştir
+  # shellcheck disable=SC1090
+  . "$SNIP"
+
+  ok "PATH ayarı tamam. Düzenleme noktası: $SNIP"
+}
+
+# # ========= 8) PATH kalıcı (login & non-login) =========
+# update_profile_path() {
+#   step "PATH kalıcı güncelleniyor (~/.profile & ~/.bashrc)…"
+
+#   # ~/.profile
+#   if ! grep -Fq '$HOME/.local/bin' "$HOME/.profile" 2>/dev/null; then
+#     cat >> "$HOME/.profile" <<'EOF'
+
+# # Local user bin
+# if [[ -d "$HOME/.local/bin" ]]; then
+#   PATH="$HOME/.local/bin:$PATH"
+# fi
+# EOF
+#   fi
+#   if ! grep -Fq '$HOME/.local/share/uv/tools/ansible-core/bin' "$HOME/.profile" 2>/dev/null; then
+#     cat >> "$HOME/.profile" <<'EOF'
+# # uv-managed Ansible binaries
+# if [[ -d "$HOME/.local/share/uv/tools/ansible-core/bin" ]]; then
+#   PATH="$HOME/.local/share/uv/tools/ansible-core/bin:$PATH"
+# fi
+# EOF
+#   fi
+
+#   # ~/.bashrc (non-login)
+#   if ! grep -Fq '$HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+#     cat >> "$HOME/.bashrc" <<'EOF'
+
+# # Ensure user-local bin in non-login shells
+# if [[ -d "$HOME/.local/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+#   PATH="$HOME/.local/bin:$PATH"
+# fi
+# EOF
+#   fi
+#   if ! grep -Fq '$HOME/.local/share/uv/tools/ansible-core/bin' "$HOME/.bashrc" 2>/dev/null; then
+#     cat >> "$HOME/.bashrc" <<'EOF'
+# # Ensure uv-managed Ansible in non-login shells
+# if [[ -d "$HOME/.local/share/uv/tools/ansible-core/bin" ]] && [[ ":$PATH:" != *":$HOME/.local/share/uv/tools/ansible-core/bin:"* ]]; then
+#   PATH="$HOME/.local/share/uv/tools/ansible-core/bin:$PATH"
+# fi
+# EOF
+#   fi
+
+#   ok "PATH kalıcı olarak yazıldı."
+# }
 
 # ========= 9) SSH & GPG (isteğe bağlı kopya) =========
 copy_ssh_keys() {
