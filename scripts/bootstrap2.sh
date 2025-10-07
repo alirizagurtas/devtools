@@ -281,9 +281,11 @@ EOF
 
 # ========= Summary =========
 print_summary() {
-  echo; echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "✅ KURULUM TAMAMLANDI!"
-  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"; echo
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+  echo
   { git --version; } 2>/dev/null || true
   { ansible --version; } 2>/dev/null || true
   { docker --version && docker compose version; } 2>/dev/null || true
